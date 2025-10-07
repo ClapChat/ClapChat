@@ -1,162 +1,194 @@
+// Initialize Firebase (already done in firebase-config.js)
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+// DOM Elements
+const loginScreen = document.getElementById('login-screen');
+const mainScreen = document.getElementById('main-screen');
+const usernameInput = document.getElementById('username');
+const passwordInput = document.getElementById('password');
+const signupBtn = document.getElementById('signup-btn');
+const loginBtn = document.getElementById('login-btn');
+const loginStatus = document.getElementById('login-status');
+const logoutBtn = document.getElementById('logout-btn');
+const greeting = document.getElementById('greeting');
+
+const addFriendInput = document.getElementById('add-friend-input');
+const friendListDiv = document.getElementById('friend-list');
+
+const chatPanel = document.getElementById('chat-panel');
+const chatWithSpan = document.getElementById('chat-with');
+const chatMessagesDiv = document.getElementById('chat-messages');
+const chatInput = document.getElementById('chat-input');
+const sendBtn = document.getElementById('send-btn');
+const clearChatBtn = document.getElementById('clear-chat-btn');
+const backToFriendsBtn = document.getElementById('back-to-friends');
+
 let currentUser = null;
-let currentChat = null;
+let currentFriend = null;
+let unsubscribeChat = null;
 
-// Elements
-const loginScreen = document.getElementById("login-screen");
-const mainScreen = document.getElementById("main-screen");
-const usernameInput = document.getElementById("username");
-const passwordInput = document.getElementById("password");
-const loginBtn = document.getElementById("login-btn");
-const signupBtn = document.getElementById("signup-btn");
-const loginStatus = document.getElementById("login-status");
-
-const logoutBtn = document.getElementById("logout-btn");
-const friendListDiv = document.getElementById("friend-list");
-const addFriendInput = document.getElementById("add-friend-input");
-const chatMessages = document.getElementById("chat-messages");
-const chatInput = document.getElementById("chat-input");
-const sendBtn = document.getElementById("send-btn");
-const sendImgBtn = document.getElementById("send-img-btn");
-const imageInput = document.getElementById("image-input");
-const chatHeader = document.getElementById("chat-header");
-const clearChatBtn = document.getElementById("clear-chat-btn");
-
-// --- Login/Signup ---
-signupBtn.onclick = async () => {
+// --------- LOGIN / SIGNUP ---------
+signupBtn.addEventListener('click', async () => {
   const username = usernameInput.value.trim();
   const password = passwordInput.value.trim();
-  if(!username || !password) return loginStatus.innerText="Fill fields";
-  const snap = await db.collection("users").where("username","==",username).get();
-  if(!snap.empty) return loginStatus.innerText="Username Taken";
-  const doc = await db.collection("users").add({username,password,friends:[],friendRequests:[]});
-  currentUser = await db.collection("users").doc(doc.id).get();
-  localStorage.setItem("clapchatUser",currentUser.id);
-  openMainScreen();
-}
+  if (!username || !password) {
+    loginStatus.textContent = "Enter username and password";
+    return;
+  }
 
-loginBtn.onclick = async () => {
+  // Check if username already exists
+  const userSnap = await db.collection('users').doc(username).get();
+  if (userSnap.exists) {
+    loginStatus.textContent = "Username already taken";
+    return;
+  }
+
+  // Create user
+  await db.collection('users').doc(username).set({
+    password,
+    friends: []
+  });
+
+  loginStatus.textContent = "Account created! Logging in...";
+  login(username, password);
+});
+
+loginBtn.addEventListener('click', () => {
   const username = usernameInput.value.trim();
   const password = passwordInput.value.trim();
-  const snap = await db.collection("users").where("username","==",username).where("password","==",password).get();
-  if(snap.empty) return loginStatus.innerText="Invalid";
-  currentUser = snap.docs[0];
-  localStorage.setItem("clapchatUser",currentUser.id);
-  openMainScreen();
-}
+  login(username, password);
+});
 
-// --- Auto-login ---
-async function autoLogin(){
-  const id = localStorage.getItem("clapchatUser");
-  if(!id) return;
-  const doc = await db.collection("users").doc(id).get();
-  if(doc.exists){ currentUser = doc; openMainScreen(); }
-}
-autoLogin();
+async function login(username, password) {
+  if (!username || !password) return;
 
-// --- Open Main ---
-function openMainScreen(){
-  loginScreen.classList.add("hidden");
-  mainScreen.classList.remove("hidden");
+  const userSnap = await db.collection('users').doc(username).get();
+  if (!userSnap.exists || userSnap.data().password !== password) {
+    loginStatus.textContent = "Invalid username or password";
+    return;
+  }
+
+  currentUser = username;
+  localStorage.setItem('clapchat_user', currentUser); // persistent login
+  greeting.textContent = `Hey, ${currentUser}`;
+  loginScreen.classList.add('hidden');
+  mainScreen.classList.remove('hidden');
   loadFriends();
 }
 
-// --- Friends ---
-async function loadFriends(){
-  friendListDiv.innerHTML = "";
-  const data = currentUser.data();
-  data.friends.forEach(f => {
-    const div = document.createElement("div");
-    div.innerText = f;
-    div.onclick = ()=>openChat(f);
+// Check persistent login
+window.addEventListener('load', async () => {
+  const savedUser = localStorage.getItem('clapchat_user');
+  if (savedUser) {
+    currentUser = savedUser;
+    greeting.textContent = `Hey, ${currentUser}`;
+    loginScreen.classList.add('hidden');
+    mainScreen.classList.remove('hidden');
+    loadFriends();
+  }
+});
+
+// --------- LOGOUT ---------
+logoutBtn.addEventListener('click', () => {
+  currentUser = null;
+  currentFriend = null;
+  localStorage.removeItem('clapchat_user');
+  loginScreen.classList.remove('hidden');
+  mainScreen.classList.add('hidden');
+  chatMessagesDiv.innerHTML = '';
+});
+
+// --------- FRIENDS ---------
+addFriendInput.addEventListener('keypress', async (e) => {
+  if (e.key !== "Enter") return;
+  const friendName = addFriendInput.value.trim();
+  if (!friendName || friendName === currentUser) return;
+
+  const friendSnap = await db.collection('users').doc(friendName).get();
+  if (!friendSnap.exists) {
+    alert("User does not exist");
+    return;
+  }
+
+  // Add friend to both users
+  await db.collection('users').doc(currentUser).update({
+    friends: firebase.firestore.FieldValue.arrayUnion(friendName)
+  });
+  await db.collection('users').doc(friendName).update({
+    friends: firebase.firestore.FieldValue.arrayUnion(currentUser)
+  });
+
+  addFriendInput.value = '';
+  loadFriends();
+});
+
+// Load friend list
+async function loadFriends() {
+  friendListDiv.innerHTML = '';
+  const userSnap = await db.collection('users').doc(currentUser).get();
+  const friends = userSnap.data().friends || [];
+  friends.forEach(friend => {
+    const div = document.createElement('div');
+    div.textContent = friend;
+    div.addEventListener('click', () => openChat(friend));
     friendListDiv.appendChild(div);
   });
 }
 
-// --- Add Friend ---
-addFriendInput.onkeypress = async (e)=>{
-  if(e.key!=="Enter") return;
-  const name = addFriendInput.value.trim();
-  if(!name) return;
-  const snap = await db.collection("users").where("username","==",name).get();
-  if(snap.empty) return alert("User not found");
-  const userDoc = snap.docs[0];
-  if(userDoc.data().friends.includes(currentUser.data().username)) return alert("Already friends");
-  await userDoc.ref.update({friendRequests: firebase.firestore.FieldValue.arrayUnion(currentUser.data().username)});
-  alert("Request sent");
-  addFriendInput.value="";
+// --------- CHAT ---------
+async function openChat(friend) {
+  currentFriend = friend;
+  chatWithSpan.textContent = friend;
+  chatPanel.style.display = 'flex';
+  chatMessagesDiv.innerHTML = '';
+
+  if (unsubscribeChat) unsubscribeChat(); // remove old listener
+
+  unsubscribeChat = db.collection('chats')
+    .doc(getChatId(currentUser, currentFriend))
+    .collection('messages')
+    .orderBy('timestamp')
+    .onSnapshot(snapshot => {
+      chatMessagesDiv.innerHTML = '';
+      snapshot.forEach(doc => {
+        const msg = doc.data();
+        const div = document.createElement('div');
+        div.classList.add('message');
+        div.classList.add(msg.sender === currentUser ? 'from-me' : 'from-them');
+        div.textContent = msg.text;
+        chatMessagesDiv.appendChild(div);
+      });
+      chatMessagesDiv.scrollTop = chatMessagesDiv.scrollHeight;
+    });
 }
 
-// --- Open Chat ---
-async function openChat(friend){
-  currentChat = friend;
-  chatHeader.innerText = friend;
-  chatMessages.innerHTML = "";
-  const messagesSnap = await db.collection("messages").where("participants","array-contains",currentUser.data().username).orderBy("timestamp").get();
-  messagesSnap.forEach(doc=>{
-    const m = doc.data();
-    if(m.participants.includes(friend)){
-      const div = document.createElement("div");
-      div.className = "message " + (m.sender===currentUser.data().username ? "from-me" : "from-them");
-      if(m.type==="text") div.innerText = m.content;
-      else if(m.type==="image") {
-        const img = document.createElement("img");
-        img.src = m.content;
-        img.style.maxWidth="200px";
-        div.appendChild(img);
-      }
-      chatMessages.appendChild(div);
-    }
-  });
-  chatMessages.scrollTop = chatMessages.scrollHeight;
+function getChatId(user1, user2) {
+  return [user1, user2].sort().join('_'); // consistent chat id
 }
 
-// --- Send Message ---
-sendBtn.onclick = async ()=>{
+// Send message
+sendBtn.addEventListener('click', async () => {
   const text = chatInput.value.trim();
-  if(!text || !currentChat) return;
-  await db.collection("messages").add({
-    participants: [currentUser.data().username,currentChat],
-    sender: currentUser.data().username,
-    type: "text",
-    content: text,
-    timestamp: Date.now()
-  });
-  chatInput.value="";
-  openChat(currentChat);
-}
+  if (!text || !currentFriend) return;
 
-// --- Send Image ---
-sendImgBtn.onclick = ()=>imageInput.click();
-imageInput.onchange = async (e)=>{
-  if(!currentChat) return;
-  const file = e.target.files[0];
-  const ref = storage.ref().child(`images/${Date.now()}-${file.name}`);
-  await ref.put(file);
-  const url = await ref.getDownloadURL();
-  await db.collection("messages").add({
-    participants: [currentUser.data().username,currentChat],
-    sender: currentUser.data().username,
-    type: "image",
-    content: url,
-    timestamp: Date.now()
+  const chatId = getChatId(currentUser, currentFriend);
+  await db.collection('chats').doc(chatId).collection('messages').add({
+    text,
+    sender: currentUser,
+    timestamp: firebase.firestore.FieldValue.serverTimestamp()
   });
-  openChat(currentChat);
-}
 
-// --- Clear Chat ---
-clearChatBtn.onclick = async ()=>{
-  if(!currentChat) return;
-  if(!confirm("Clear chat?")) return;
-  const snap = await db.collection("messages").where("participants","array-contains",currentUser.data().username).get();
-  snap.forEach(doc=>{
-    const m = doc.data();
-    if(m.participants.includes(currentChat)) doc.ref.delete();
-  });
-  openChat(currentChat);
-}
+  chatInput.value = '';
+});
 
-// --- Logout ---
-logoutBtn.onclick = ()=>{
-  localStorage.removeItem("clapchatUser");
-  location.reload();
-}
+// Clear chat (local only)
+clearChatBtn.addEventListener('click', () => {
+  chatMessagesDiv.innerHTML = '';
+});
+
+// Back to friends
+backToFriendsBtn.addEventListener('click', () => {
+  chatPanel.style.display = 'none';
+  currentFriend = null;
+});
