@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ClapChat</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClapChat</title>
+<link rel="stylesheet" href="style.css">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 </head>
 <body>
 
-<!-- LOGIN / LANDING SCREEN -->
+<!-- LOGIN SCREEN -->
 <div id="login-screen" class="screen">
-  <div id="login-left">
+  <div id="login-container">
     <h1>ClapChat</h1>
     <input type="text" id="username" placeholder="Username">
     <input type="password" id="password" placeholder="Password">
@@ -23,7 +23,7 @@
     </div>
     <p id="login-status"></p>
   </div>
-  <div id="login-right">
+  <div id="promo-container">
     <h2>Welcome to ClapChat!</h2>
     <p>ClapChat is the best school texting website! Connect with your friends, send messages, and share photos easily.</p>
   </div>
@@ -41,8 +41,7 @@
     </div>
     <button id="logout-btn">Log Out</button>
   </div>
-
-  <div id="chat-screen">
+  <div id="chat-area">
     <div id="notifications"></div>
     <div id="chat-header"></div>
     <div id="chat-messages"></div>
