@@ -13,7 +13,7 @@
 
 <!-- LOGIN SCREEN -->
 <div id="login-screen" class="screen">
-  <div id="login-container">
+  <div id="login-left">
     <h1>ClapChat</h1>
     <input type="text" id="username" placeholder="Username">
     <input type="password" id="password" placeholder="Password">
@@ -23,34 +23,37 @@
     </div>
     <p id="login-status"></p>
   </div>
-  <div id="promo-container">
+  <div id="login-right">
     <h2>Welcome to ClapChat!</h2>
-    <p>ClapChat is the best school texting website! Connect with your friends, send messages, and share photos easily.</p>
+    <p>ClapChat is the best school texting website! Connect with friends, send messages, and share photos easily.</p>
   </div>
 </div>
 
 <!-- MAIN SCREEN -->
 <div id="main-screen" class="screen hidden">
-  <div id="sidebar">
-    <h2>Friends</h2>
-    <input type="text" id="add-friend-input" placeholder="Add Friend">
-    <div id="friend-list"></div>
-    <div id="update-board">
-      <h3>Update</h3>
-      <p>First Release</p>
-    </div>
-    <button id="logout-btn">Log Out</button>
+  <div id="top-bar">
+    <h2 id="greeting">Hey, Username</h2>
+    <button id="logout-btn">Logout</button>
   </div>
-  <div id="chat-area">
-    <div id="notifications"></div>
-    <div id="chat-header"></div>
-    <div id="chat-messages"></div>
-    <div id="chat-input-area">
-      <input type="text" id="chat-input" placeholder="Type a message">
-      <button id="send-btn">Send</button>
-      <button id="send-img-btn">📷</button>
-      <input type="file" id="image-input" style="display:none;">
-      <button id="clear-chat-btn">Clear Chat</button>
+
+  <div id="main-container">
+    <div id="friend-list-panel">
+      <h3>Your Friends</h3>
+      <input type="text" id="add-friend-input" placeholder="Add friend">
+      <div id="friend-list"></div>
+    </div>
+
+    <div id="chat-panel">
+      <div id="chat-header">
+        <button id="back-to-friends">Back</button>
+        <span id="chat-with">Select a friend</span>
+      </div>
+      <div id="chat-messages"></div>
+      <div id="chat-input-area">
+        <input type="text" id="chat-input" placeholder="Type a message">
+        <button id="send-btn">Send</button>
+        <button id="clear-chat-btn">Clear Chat</button>
+      </div>
     </div>
   </div>
 </div>
