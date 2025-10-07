@@ -12,7 +12,7 @@
 <body>
 
 <!-- LOGIN SCREEN -->
-<div id="login-screen" class="screen">
+<div id="login-screen">
   <div id="login-left">
     <h1>ClapChat</h1>
     <input type="text" id="username" placeholder="Username">
@@ -30,19 +30,24 @@
 </div>
 
 <!-- MAIN SCREEN -->
-<div id="main-screen" class="screen hidden">
+<div id="main-screen" class="hidden">
   <div id="top-bar">
     <h2 id="greeting">Hey, Username</h2>
     <button id="logout-btn">Logout</button>
   </div>
 
   <div id="main-container">
+    <!-- FRIENDS PANEL -->
     <div id="friend-list-panel">
-      <h3>Your Friends</h3>
       <input type="text" id="add-friend-input" placeholder="Add friend">
       <div id="friend-list"></div>
+      <div id="update-board">
+        <h3>Update</h3>
+        <p>First Release</p>
+      </div>
     </div>
 
+    <!-- CHAT PANEL -->
     <div id="chat-panel">
       <div id="chat-header">
         <button id="back-to-friends">Back</button>
