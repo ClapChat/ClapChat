@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ClapChat</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
+</head>
+<body>
+  <div id="login-screen" class="screen">
+    <h1>ClapChat</h1>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button id="signup-btn">Sign Up</button>
+    <button id="login-btn">Log In</button>
+    <p id="login-status"></p>
+  </div>
+
+  <div id="main-screen" class="screen hidden">
+    <div id="sidebar">
+      <h2>Friends</h2>
+      <input type="text" id="add-friend-input" placeholder="Add Friend">
+      <div id="friend-list"></div>
+      <h3>Update</h3>
+      <div id="update-board"><p>(added this)</p></div>
+      <button id="logout-btn">Log Out</button>
+    </div>
+    <div id="chat-screen">
+      <div id="chat-header"></div>
+      <div id="chat-messages"></div>
+      <input type="text" id="chat-input" placeholder="Type a message">
+      <button id="send-btn">Send</button>
+      <button id="send-img-btn">Send Image</button>
+      <button id="clear-chat-btn">Clear Chat</button>
+      <input type="file" id="image-input" style="display:none;">
+    </div>
+  </div>
+
+  <script src="firebase-config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
