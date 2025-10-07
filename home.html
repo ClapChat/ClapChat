@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Clap Chat Home</title>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+<style>
+body { margin:0; font-family: Arial,sans-serif; background:#fffc00; display:flex; height:100vh; }
+#sidebar { width:300px; padding:20px; display:flex; flex-direction:column; gap:20px; position: relative; }
+#welcome { font-size:22px; font-weight:bold; color:#000; }
+.box { background:#fff; padding:15px 20px; border-radius:15px; }
+.box h2 { margin-top:0; margin-bottom:10px; font-size:18px; color:#000; }
+.box input { width:100%; padding:10px 15px; margin-bottom:10px; border-radius:10px; border:1px solid #ccc; font-size:16px; box-sizing:border-box; }
+.box button { width:100%; padding:10px 15px; border-radius:10px; border:none; background:#000; color:#fffc00; cursor:pointer; font-size:16px; margin-bottom:5px; }
+.box button:hover {background:#333;}
+#status { margin-top:5px; font-size:14px;}
+#status.valid {color:green;}
+#status.invalid {color:red;}
+#friendsList { margin-top:10px; max-height:300px; overflow-y:auto; display:flex; flex-direction:column; gap:5px; }
+#friendsList button { width:100%; text-align:left; padding:8px 12px; border-radius:10px; border:none; background:#000; color:#fffc00; cursor:pointer; font-size:16px; display:flex; justify-content: space-between; align-items: center; }
+#friendsList button:hover {background:#333;}
+.status-dot { width:10px; height:10px; border-radius:50%; margin-left:5px; }
+.status-online { background:green; }
+.status-offline { background:red; }
+.unread-indicator { width:10px; height:10px; border-radius:50%; background:white; margin-left:5px; }
+
+/* Notification Center top-right */
+#notifications { position:absolute; top:10px; right:10px; width:250px; background:#fff; border-radius:10px; padding:10px; max-height:300px; overflow-y:auto; display:none; flex-direction:column; gap:5px; z-index:10; }
+.notification { background:#fffc00; padding:5px 10px; border-radius:10px; display:flex; justify-content: space-between; align-items:center; }
+.notification button { padding:5px 10px; border-radius:5px; border:none; cursor:pointer; }
+.notification button.accept { background:green; color:#fff; }
+.notification button.decline { background:red; color:#fff; }
+
+/* Chat */
+#chatContainer { flex-grow:1; display:flex; justify-content:center; align-items:center; padding:20px; box-sizing:border-box; }
+#chatBox { width:100%; max-width:600px; background:#fff; border-radius:15px; display:flex; flex-direction:column; padding:20px; box-sizing:border-box; height:80vh; }
+#chatHeader { font-weight:bold; font-size:20px; display:flex; justify-content:space-between; align-items:center; }
+#messages { flex-grow:1; overflow-y:auto; border:1px solid #ccc; border-radius:10px; padding:10px; background:#f9f9f9; margin:10px 0; font-size:16px; }
+.message.you { color:blue; margin-bottom:5px; }
+.message.friend { color:green; margin-bottom:5px; }
+.message .read { font-size:12px; color:#555; margin-left:5px; }
+#chatInput { width: calc(100% - 90px); padding:10px; border-radius:10px; border:1px solid #ccc; font-size:16px; }
+#sendBtn, #removeFriendBtn { padding:10px 15px; border-radius:10px; border:none; background:#000; color:#fffc00; cursor:pointer; font-size:16px; margin-left:5px; }
+#sendBtn:hover, #removeFriendBtn:hover { background:#333; }
+#inputContainer { display:flex; margin-top:10px; align-items:center; }
+</style>
+</head>
+<body>
+
+<div id="sidebar">
+  <div id="welcome">Welcome, user</div>
+  <div id="notifications"></div>
+
+  <div class="box">
+    <h2>Add Friends</h2>
+    <input type="text" id="friendInput" placeholder="Enter username">
+    <button onclick="addFriend()">Add Friend</button>
+    <div id="status"></div>
+  </div>
+
+  <div class="box">
+    <h2>Friends List</h2>
+    <div id="friendsList">Loading...</div>
+  </div>
+</div>
+
+<div id="chatContainer">
+  <div id="chatBox">
+    <div id="chatHeader">
+      <span>Select a friend</span>
+      <button id="removeFriendBtn" onclick="removeFriend()">Remove Friend</button>
+    </div>
+    <div id="messages"></div>
+    <div id="inputContainer">
+      <input type="text" id="chatInput" placeholder="Type a message">
+      <button id="sendBtn" onclick="sendMessage()">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyCk8Iwb8sFF90ToYE44l8d95uKSB-jPBU8",
+  authDomain: "clapchat-852a6.firebaseapp.com",
+  projectId: "clapchat-852a6",
+  storageBucket: "clapchat-852a6.appspot.com",
+  messagingSenderId: "918530152107",
+  appId: "1:918530152107:web:87f233eaae46c2178a89ee"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+const username = localStorage.getItem('username');
+if(!username) window.location.href="index.html";
+document.getElementById('welcome').innerText = `Welcome, ${username}`;
+
+let currentFriend = null;
+let unsubscribeChat = null;
+
+// Online/Offline status
+async function setOnlineStatus(status){
+  const userDoc = await db.collection('users').where('username','==',username).get();
+  if(!userDoc.empty) await userDoc.docs[0].ref.update({online: status});
+}
+window.addEventListener('beforeunload', ()=>setOnlineStatus(false));
+setOnlineStatus(true);
+
+// Utility to get current user doc
+async function getCurrentUserDoc() {
+  const snapshot = await db.collection('users').where('username', '==', username).get();
+  if(snapshot.empty) return null;
+  return snapshot.docs[0];
+}
+
+// Friend Requests
+async function checkFriendRequests() {
+  const doc = await getCurrentUserDoc();
+  const notificationsDiv = document.getElementById('notifications');
+  notificationsDiv.innerHTML = "";
+  if(!doc) return;
+  const requests = doc.data().friendRequests || [];
+  if(requests.length===0) { notificationsDiv.style.display="none"; return; }
+  notificationsDiv.style.display="flex";
+  requests.forEach(req=>{
+    const div = document.createElement('div');
+    div.className="notification";
+    div.innerHTML = `<span>${req} wants to be your friend</span>`;
+    const acceptBtn = document.createElement('button');
+    acceptBtn.className="accept";
+    acceptBtn.innerText="Accept";
+    acceptBtn.onclick=()=>respondFriend(req,true);
+    const declineBtn = document.createElement('button');
+    declineBtn.className="decline";
+    declineBtn.innerText="Decline";
+    declineBtn.onclick=()=>respondFriend(req,false);
+    div.appendChild(acceptBtn);
+    div.appendChild(declineBtn);
+    notificationsDiv.appendChild(div);
+  });
+}
+
+async function respondFriend(friendUsername,accept){
+  const doc = await getCurrentUserDoc();
+  if(!doc) return;
+  let fr = doc.data().friendRequests || [];
+  fr = fr.filter(f=>f!==friendUsername);
+  await doc.ref.update({friendRequests: fr});
+  if(accept){
+    await doc.ref.update({friends: firebase.firestore.FieldValue.arrayUnion(friendUsername)});
+    const friendDoc = (await db.collection('users').where('username','==',friendUsername).get()).docs[0];
+    await friendDoc.ref.update({friends: firebase.firestore.FieldValue.arrayUnion(username)});
+  }
+  checkFriendRequests();
+  loadFriends();
+}
+
+// Add Friend
+async function addFriend() {
+  const friendUsername = document.getElementById('friendInput').value.trim();
+  const statusDiv = document.getElementById('status');
+  if(!friendUsername) { statusDiv.innerText="Enter a username"; statusDiv.className="invalid"; return; }
+  if(friendUsername===username) { statusDiv.innerText="Cannot add yourself"; statusDiv.className="invalid"; return; }
+  const friendQuery = await db.collection('users').where('username','==',friendUsername).get();
+  if(friendQuery.empty){ statusDiv.innerText="Username not found"; statusDiv.className="invalid"; return; }
+  const friendDoc = friendQuery.docs[0];
+  await friendDoc.ref.update({friendRequests: firebase.firestore.FieldValue.arrayUnion(username)});
+  statusDiv.innerText=`Friend request sent to ${friendUsername}`; statusDiv.className="valid";
+  document.getElementById('friendInput').value="";
+}
+
+// Remove Friend
+async function removeFriend() {
+  if(!currentFriend) return;
+  const doc = await getCurrentUserDoc();
+  const friendDoc = (await db.collection('users').where('username','==',currentFriend).get()).docs[0];
+  await doc.ref.update({friends: firebase.firestore.FieldValue.arrayRemove(currentFriend)});
+  await friendDoc.ref.update({friends: firebase.firestore.FieldValue.arrayRemove(username)});
+  currentFriend=null;
+  document.getElementById('chatHeader').firstChild.nodeValue="Select a friend";
+  document.getElementById('messages').innerHTML="";
+  loadFriends();
+}
+
+// Load friends with online & unread indicators
+async function loadFriends() {
+  const friendsListDiv=document.getElementById('friendsList');
+  friendsListDiv.innerHTML="Loading...";
+  const currentUserDoc=await getCurrentUserDoc();
+  if(!currentUserDoc){ friendsListDiv.innerHTML="Error"; return; }
+  const data=currentUserDoc.data();
+  const friendsArray=data.friends||[];
+  const mutualFriends=[];
+  for(let f of friendsArray){
+    const friendSnap=await db.collection('users').where('username','==',f).get();
+    if(friendSnap.empty) continue;
+    const friendData=friendSnap.docs[0].data();
+    if(friendData.friends && friendData.friends.includes(username)) {
+      mutualFriends.push({name:f,online:friendData.online});
+    }
+  }
+  friendsListDiv.innerHTML="";
+  if(mutualFriends.length===0){ friendsListDiv.innerHTML="No friends yet"; return; }
+  
+  for(let f of mutualFriends){
+    const chatId=[username,f.name].sort().join("_");
+    const chatRef = await db.collection('chats').doc(chatId).get();
+    let hasUnread=false;
+    if(chatRef.exists){
+      const msgs = chatRef.data().messages||[];
+      hasUnread = msgs.some(m=>m.sender===f.name && !(m.readBy||[]).includes(username));
+    }
+    const btn=document.createElement('button');
+    btn.innerText=f.name;
+    if(hasUnread){
+      const dot=document.createElement('span');
+      dot.className="unread-indicator";
+      btn.appendChild(dot);
+    }
+    const dot = document.createElement('span');
+    dot.className="status-dot "+(f.online?"status-online":"status-offline");
+    btn.appendChild(dot);
+    btn.onclick=()=>openChat(f.name);
+    friendsListDiv.appendChild(btn);
+  }
+}
+
+// Chat functions
+async function openChat(friendUsername) {
+  currentFriend=friendUsername;
+  document.getElementById('chatHeader').firstChild.nodeValue=friendUsername;
+  if(unsubscribeChat) unsubscribeChat(); // remove old listener
+  const chatId=[username,friendUsername].sort().join("_");
+  const chatRef = db.collection('chats').doc(chatId);
+  
+  // Mark unread as read
+  const docSnap = await chatRef.get();
+  if(docSnap.exists){
+    const messages = docSnap.data().messages||[];
+    const updated = messages.map(m=>{
+      if(m.sender===friendUsername){
+        if(!m.readBy) m.readBy=[];
+        if(!m.readBy.includes(username)) m.readBy.push(username);
+      }
+      return m;
+    });
+    await chatRef.update({messages:updated});
+  }
+
+  // Real-time listener
+  unsubscribeChat = chatRef.onSnapshot(doc=>{
+    const messagesDiv = document.getElementById('messages');
+    messagesDiv.innerHTML="";
+    if(!doc.exists) return;
+    const messages = doc.data().messages||[];
+    messages.forEach(msg=>{
+      const div=document.createElement('div');
+      div.className="message "+(msg.sender===username?"you":"friend");
+      div.innerText=`${msg.sender} ) ${msg.text}`;
+      if(msg.sender===username && msg.readBy && msg.readBy.includes(currentFriend)){
+        const readSpan=document.createElement('span');
+        readSpan.className="read";
+        readSpan.innerText="(read)";
+        div.appendChild(readSpan);
+      }
+      messagesDiv.appendChild(div);
+    });
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  });
+
+  loadFriends(); // to remove unread dot
+}
+
+async function sendMessage(){
+  if(!currentFriend) return;
+  const input=document.getElementById('chatInput');
+  const text=input.value.trim();
+  if(!text) return;
+  const chatId=[username,currentFriend].sort().join("_");
+  const chatRef=db.collection('chats').doc(chatId);
+  await chatRef.set({ 
+    messages: firebase.firestore.FieldValue.arrayUnion({
+      sender:username,
+      text:text,
+      timestamp:Date.now(),
+      readBy:[],
+    }) 
+  },{merge:true});
+  input.value="";
+}
+
+setInterval(()=>{ loadFriends(); checkFriendRequests(); },5000);
+
+loadFriends();
+checkFriendRequests();
+</script>
+</body>
+</html>

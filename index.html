@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clap Chat Login</title>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore-compat.js"></script>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; font-family:'Arial',sans-serif; }
+    body {
+      background: #fffc00;
+      display:flex; justify-content:center; align-items:center; height:100vh;
+    }
+    .login-container {
+      background:#fff; padding:40px 30px; border-radius:25px;
+      box-shadow:0 8px 20px rgba(0,0,0,0.2); width:350px; text-align:center;
+    }
+    .login-container h1 { color:#000; font-size:36px; margin-bottom:20px; }
+    .login-container input {
+      width:100%; padding:12px 15px; margin:10px 0;
+      border:1px solid #ccc; border-radius:25px; font-size:16px;
+    }
+    .login-container button {
+      width:100%; padding:12px; margin-top:15px;
+      border:none; border-radius:25px; background-color:#000; color:#fffc00;
+      font-size:18px; cursor:pointer; transition:0.3s;
+    }
+    .login-container button:hover { background-color:#333; }
+    .signup-btn {
+      width:100%; padding:12px; margin-top:10px; border:1px solid #000;
+      border-radius:25px; background-color:#fff; color:#000; font-size:16px;
+      cursor:pointer; transition:0.3s;
+    }
+    .signup-btn:hover { background-color:#000; color:#fffc00; }
+  </style>
+</head>
+<body>
+
+<div class="login-container">
+  <h1>Clap Chat</h1>
+  <input type="text" id="username" placeholder="Username" required>
+  <input type="password" id="password" placeholder="Password" required>
+  <button onclick="login()">Log In</button>
+  <button class="signup-btn" onclick="signup()">Sign Up</button>
+</div>
+
+<script>
+  const firebaseConfig = {
+    apiKey: "AIzaSyCk8Iwb8sFF90ToYE44l8d95uKSB-jPBU8",
+    authDomain: "clapchat-852a6.firebaseapp.com",
+    projectId: "clapchat-852a6",
+    storageBucket: "clapchat-852a6.firebasestorage.app",
+    messagingSenderId: "918530152107",
+    appId: "1:918530152107:web:87f233eaae46c2178a89ee"
+  };
+
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  async function signup() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+
+    if(!username || !password) {
+      alert('Please enter both username and password.');
+      return;
+    }
+
+    const querySnapshot = await db.collection('users')
+      .where('username', '==', username)
+      .get();
+
+    if(!querySnapshot.empty) {
+      alert('Username already taken.');
+      return;
+    }
+
+    await db.collection('users').add({
+      username: username,
+      password: password,  // ⚠️ plaintext for demo; hash in production
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+
+    // Store username and redirect
+    localStorage.setItem('username', username);
+    window.location.href = "home.html";
+  }
+
+  async function login() {
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value.trim();
+
+    if(!username || !password) {
+      alert('Please enter both username and password.');
+      return;
+    }
+
+    const querySnapshot = await db.collection('users')
+      .where('username', '==', username)
+      .get();
+
+    if(querySnapshot.empty) {
+      alert('Username does not exist.');
+      return;
+    }
+
+    const userData = querySnapshot.docs[0].data();
+    if(userData.password !== password) {
+      alert('Incorrect password.');
+      return;
+    }
+
+    // Store username and redirect
+    localStorage.setItem('username', username);
+    window.location.href = "home.html";
+  }
+</script>
+
+</body>
+</html>
